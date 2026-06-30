@@ -1,30 +1,64 @@
-from scraper import get_page_info
+import sys
+import asyncio
+from fastapi import FastAPI
+import uvicorn
+from dotenv import load_dotenv
+
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+
+# 내부 모듈 임포트
+from scraper import scrape_all_pages
 from agent import analyze_and_extract
-import time
+from config import TARGET_SITE
 
-visited = set()
+app = FastAPI(title="GLGC 크롤링 에이전트 API")
 
-def crawl(url, depth=0):
-    if depth > 3 or url in visited: return
-    visited.add(url)
+# 크롤링 결과를 담아둘 인메모리 캐시
+crawled_data_cache = []
+
+@app.get("/api/crawled-data")
+async def get_crawled_data(refresh: bool = False):
+    global crawled_data_cache
+    if crawled_data_cache and not refresh:
+        print("캐시된 데이터를 반환합니다.")
+        return {
+            "status": "success", 
+            "total_count": len(crawled_data_cache), 
+            "data": crawled_data_cache
+        }
+        
+    print("새로운 크롤링 및 LLM 분석을 시작합니다...")
     
-    print(f"[{depth} 단계] 분석 중: {url}")
-    content, links = get_page_info(url)
+    # 1. 스크래핑 파이프라인 가동
+    pages_data = await scrape_all_pages(TARGET_SITE)
+    valid_data_list = []
     
-    # 1. LLM 분석
-    result = analyze_and_extract(content, url)
+    # 2. LLM 분석 파이프라인 가동
+    for item in pages_data:
+        extracted_json = await analyze_and_extract(item['content'], item['url'])
+        if extracted_json:
+            print(f"  ✅ 추출 성공: {extracted_json.get('name', '이름 없음')}")
+            valid_data_list.append(extracted_json)
+        else:
+            print(f"  ⏭️ 스킵됨: {item['url']}")
+            
+    # 3. 결과 캐싱
+    crawled_data_cache = valid_data_list
     
-    # 2. 결과 저장 및 출력
-    if result and result != 'skip':
-        print(f"데이터 추출 성공: {result.get('action_name')}")
-        # 여기서 백엔드 API로 전송하거나 DB에 저장
-    else:
-        # 3. 재귀 탐색
-        for next_url in links:
-            if "e-policy.or.kr" in next_url: # 도메인 제한
-                time.sleep(1)
-                crawl(next_url, depth + 1)
+    return {
+        "status": "success", 
+        "total_count": len(crawled_data_cache), 
+        "data": crawled_data_cache
+    }
+    
 
 if __name__ == "__main__":
-    start_url = "https://www.e-policy.or.kr/web/lay1/program/S1T9C14/curation/list.do"
-    crawl(start_url)
+    import sys
+    import asyncio
+    
+
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+    
+uvicorn.run(app, host="127.0.0.1", port=8001)
