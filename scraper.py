@@ -1,5 +1,12 @@
 import asyncio
 from playwright.async_api import async_playwright
+import json
+
+# 저장 기능을 담당하는 별도 함수
+def save_to_json(data, filename="crawled_data.json"):
+    with open(filename, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
+    print(f"파일 저장 완료: {filename}")
 
 async def scrape_all_pages(base_url):
     results = []
@@ -31,5 +38,5 @@ async def scrape_all_pages(base_url):
                 print(f"페이지 로드 실패 ({link}): {e}")
                 
         await browser.close()
-        
+   
     return results
