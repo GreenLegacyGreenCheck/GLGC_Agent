@@ -5,7 +5,7 @@ from utils import extract_json_from_text
 import os
 genai.configure(api_key=GEMINI_API_KEY)
 
-model = genai.GenerativeModel("models/gemini-2.5-pro")
+model = genai.GenerativeModel("models/gemini-2.5-flash")
 
 async def analyze_and_extract(content, base_url):
     prompt = f"""
@@ -50,7 +50,6 @@ async def analyze_and_extract(content, base_url):
     """
     
     try:
-        # 🚀 Gemini API 자체 기능으로 JSON 출력 강제하기
         response = await model.generate_content_async(
             prompt,
             generation_config={"response_mime_type": "application/json"}
@@ -61,7 +60,6 @@ async def analyze_and_extract(content, base_url):
             
         result_json = json.loads(response.text.strip())
         
-        # skip 처리된 경우 걸러내기
         if result_json.get("status") == "skip":
             return None
             
