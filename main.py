@@ -43,6 +43,7 @@ async def get_crawled_data(refresh: bool = False):
             
         if idx < len(pages_data) - 1:
             await asyncio.sleep(7)
+    
             
     # 3. 파일 저장 (로컬 백업용)
     with open(DATA_FILE, 'w', encoding='utf-8') as f:

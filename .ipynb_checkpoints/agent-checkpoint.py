@@ -49,22 +49,31 @@ async def analyze_and_extract(content, base_url):
     {content[:10000]}
     """
     
-    try:
-        response = await model.generate_content_async(
-            prompt,
-            generation_config={"response_mime_type": "application/json"}
-        )
-        
-        if not response.text:
-            return None
+    
+    for attempt in range(3): # 에러 나면 최대 3번까지 스스로 재시도
+        try:
+            response = await model.generate_content_async(
+                prompt,
+                generation_config={"response_mime_type": "application/json"}
+            )
             
-        result_json = json.loads(response.text.strip())
-        
-        if result_json.get("status") == "skip":
-            return None
+            if not response.text:
+                return None
+                
+            result_json = json.loads(response.text.strip())
             
-        return result_json
-        
-    except Exception as e:
-        print(f"DEBUG_ERROR (LLM 분석 실패): {e}")
-        return None
+            if result_json.get("status") == "skip":
+                return None
+                
+            return result_json
+            
+        except Exception as e:
+            error_msg = str(e)
+            if "429" in error_msg or "Quota" in error_msg:
+                print(f"⚠️ 429 속도 제한 방어막 가동! 40초 대기 후 재시도합니다... (시도: {attempt+1}/3)")
+                await asyncio.sleep(40)
+            else:
+                print(f"DEBUG_ERROR (LLM 분석 실패): {e}")
+                return None
+                
+    return None
